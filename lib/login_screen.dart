@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'home_screen.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -41,8 +42,13 @@ class LoginScreen extends StatelessWidget {
               onPressed: () {
                 String enteredUsername = usernameController.text;
                 String enteredPassword = passwordController.text;
-                // Add logic to handle login submission
-                print("Username: $enteredUsername, Password: $enteredPassword");
+
+                String role = "Admin";
+
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => HomeScreen(userRole: role)),
+                );
               },
               child: Text("Submit"),
             ),
