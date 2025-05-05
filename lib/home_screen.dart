@@ -17,10 +17,23 @@ class _HomeScreenState extends State<HomeScreen> {
   String userName = '';
   String email = '';
 
+
   final List<Map<String, String>> mockSchedule = [
-    {'time': '8:00 AM - 10:00 AM', 'course': 'CSAI101 - Data Structures'},
-    {'time': '11:00 AM - 1:00 PM', 'course': 'CSAI205 - Operating Systems'},
-    {'time': '2:00 PM - 3:30 PM', 'course': 'CSAI310 - Software Engineering'},
+    {
+      'time': '8:00 AM - 10:00 AM',
+      'course': 'CSAI101 - Data Structures',
+      'room': 'F 02',
+    },
+    {
+      'time': '11:00 AM - 1:00 PM',
+      'course': 'CSAI205 - Operating Systems',
+      'room': 'G 07',
+    },
+    {
+      'time': '2:00 PM - 3:30 PM',
+      'course': 'CSAI310 - Software Engineering',
+      'room': 'S 06',
+    },
   ];
 
   @override
@@ -172,8 +185,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 margin: const EdgeInsets.symmetric(vertical: 6),
                 child: ListTile(
                   leading: const Icon(Icons.schedule, color: Color(0xFF8D0035)),
-                  title: Text(item['course']!),
-                  subtitle: Text(item['time']!),
+                  title: Text(item['course'] ?? ''),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item['time'] ?? ''),
+                      Text(
+                        "Room: ${item['room'] ?? 'N/A'}",
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
             },
@@ -263,8 +288,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 margin: const EdgeInsets.symmetric(vertical: 6),
                 child: ListTile(
                   leading: const Icon(Icons.schedule, color: Color(0xFF8D0035)),
-                  title: Text(item['course']!),
-                  subtitle: Text(item['time']!),
+                  title: Text(item['course'] ?? ''),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item['time'] ?? ''),
+                      Text(
+                        "Room: ${item['room'] ?? 'N/A'}",
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
             },
