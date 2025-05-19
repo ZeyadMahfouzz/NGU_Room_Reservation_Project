@@ -365,22 +365,41 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                                   : Colors.orange.shade800,
                             ),
                           ),
-                          trailing: status.isAvailable && !status.hasPendingRequest && userRole != 'student'
-                              ? ElevatedButton(
-                            onPressed: () => _reserveSlot(slot),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF8D0035),
-                              foregroundColor: Colors.white,
-                            ),
-                            child: const Text('Reserve'),
-                          )
-                              : Icon(
-                            status.reservationType == 'system'
-                                ? Icons.school
-                                : Icons.event_busy,
-                            color: status.reservationType == 'system'
-                                ? Colors.blue.shade800
-                                : Colors.orange.shade800,
+                          trailing: Builder(
+                            builder: (context) {
+                              // For students: show icon only if reserved
+                              if (userRole == 'student') {
+                                if (!status.isAvailable) {
+                                  return Icon(
+                                    status.reservationType == 'system' ? Icons.school : Icons.event_busy,
+                                    color: status.reservationType == 'system'
+                                        ? Colors.blue.shade800
+                                        : Colors.orange.shade800,
+                                  );
+                                } else {
+                                  return const SizedBox(); // Do not show button or icon if it's not reserved
+                                }
+                              }
+
+                              // For faculty/admin: show button if available
+                              if (status.isAvailable && !status.hasPendingRequest) {
+                                return ElevatedButton(
+                                  onPressed: () => _reserveSlot(slot),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF8D0035),
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  child: const Text('Reserve'),
+                                );
+                              } else {
+                                return Icon(
+                                  status.reservationType == 'system' ? Icons.school : Icons.event_busy,
+                                  color: status.reservationType == 'system'
+                                      ? Colors.blue.shade800
+                                      : Colors.orange.shade800,
+                                );
+                              }
+                            },
                           ),
                         ),
                       );
