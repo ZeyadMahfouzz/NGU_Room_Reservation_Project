@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'login_screen.dart';
+import 'view_rooms.dart';
+import 'reservation_service.dart';
+import 'view_requests_screen.dart';
+import 'view_reservations_history.dart';
 
 class HomeScreen extends StatefulWidget {
   final String userRole;
@@ -43,12 +47,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> getUserName() async {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId != null) {
-      DocumentSnapshot userDoc =
-      await FirebaseFirestore.instance.collection('users').doc(userId).get();
+    final authUid = FirebaseAuth.instance.currentUser?.uid;
+    if (authUid != null) {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('authUid', isEqualTo: authUid)
+          .limit(1)
+          .get();
 
-      if (userDoc.exists && userDoc.data() != null) {
+      if (querySnapshot.docs.isNotEmpty) {
+        final userDoc = querySnapshot.docs.first;
         setState(() {
           userName = userDoc['name'] ?? 'No Name Available';
           email = userDoc['email'] ?? 'No Email Available';
@@ -56,6 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -70,6 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
               fontWeight: FontWeight.bold,
             ),
           ),
+
           backgroundColor: const Color(0xFF8D0035),
         ),
         body: Padding(
@@ -207,7 +217,10 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 10),
         ElevatedButton.icon(
           onPressed: () {
-            // Navigate to View Available Rooms
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ViewRoomsScreen()),
+            );
           },
           icon: const Icon(Icons.meeting_room),
           label: const Text("View Rooms"),
@@ -220,7 +233,10 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 10),
         ElevatedButton.icon(
           onPressed: () {
-            // Navigate to View History
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ViewRequestsHistoryScreen()),
+            );
           },
           icon: const Icon(Icons.history),
           label: const Text("View History"),
@@ -242,7 +258,26 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 10),
         ElevatedButton.icon(
           onPressed: () {
-            // Navigate to View Requests
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ViewRoomsScreen()),
+            );
+          },
+          icon: const Icon(Icons.meeting_room),
+          label: const Text("View Rooms"),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF8D0035),
+            foregroundColor: Colors.white,
+            minimumSize: const Size(double.infinity, 50),
+          ),
+        ),
+        const SizedBox(height: 10),
+        ElevatedButton.icon(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ViewRequestsScreen()),
+            );
           },
           icon: const Icon(Icons.assignment),
           label: const Text("View Requests"),
@@ -255,10 +290,13 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 10),
         ElevatedButton.icon(
           onPressed: () {
-            // Navigate to View Available Rooms
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ViewRequestsHistoryScreen()),
+            );
           },
-          icon: const Icon(Icons.meeting_room),
-          label: const Text("View Rooms"),
+          icon: const Icon(Icons.assignment),
+          label: const Text("View History"),
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF8D0035),
             foregroundColor: Colors.white,
@@ -310,7 +348,10 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 10),
         ElevatedButton.icon(
           onPressed: () {
-            // Navigate to View Available Rooms
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ViewRoomsScreen()),
+            );
           },
           icon: const Icon(Icons.meeting_room),
           label: const Text("View Rooms"),
@@ -324,7 +365,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  DateTime? _semesterStart;
+  DateTime? _semesterEnd;
+
   Widget _buildProfileContent() {
+    final reservationService = ReservationService();
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -344,7 +390,124 @@ class _HomeScreenState extends State<HomeScreen> {
           email,
           style: const TextStyle(fontSize: 16),
         ),
-        const SizedBox(height: 30),
+        const SizedBox(height: 50),
+
+        if (widget.userRole.toLowerCase() == 'admin') ...[
+          Text(
+            "Semester Date",
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              // First pick start date
+              final startDate = await showDatePicker(
+                context: context,
+                initialDate: _semesterStart ?? DateTime.now(),
+                firstDate: DateTime(2020),
+                lastDate: DateTime(2100),
+              );
+              if (startDate != null) {
+                setState(() {
+                  _semesterStart = startDate;
+                });
+
+                // Then pick end date
+                final endDate = await showDatePicker(
+                  context: context,
+                  initialDate: _semesterEnd ?? _semesterStart!.add(const Duration(days: 90)),
+                  firstDate: _semesterStart!,
+                  lastDate: DateTime(2100),
+                );
+                if (endDate != null) {
+                  setState(() {
+                    _semesterEnd = endDate;
+                  });
+                }
+              }
+            },
+            child: Text(_semesterStart == null || _semesterEnd == null
+                ? 'Select Semester Dates'
+                : 'Dates: ${_formatDate(_semesterStart!)} - ${_formatDate(_semesterEnd!)}'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF8D0035),
+              foregroundColor: Colors.white,
+            ),
+          ),
+          const SizedBox(height:5),
+          ElevatedButton(
+            onPressed: (_semesterStart != null && _semesterEnd != null)
+                ? () async {
+              try {
+                await reservationService.reserveSemesterSlots(_semesterStart!, _semesterEnd!);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Semester reservations generated successfully')),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error: $e')),
+                );
+              }
+            }
+                : null,
+            child: const Text('Generate Semester Reservations'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: (_semesterStart != null && _semesterEnd != null) ? const Color(0xFF8D0035) : Colors.grey,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 50),
+            ),
+          ),
+          const SizedBox(height: 10),
+          ElevatedButton(
+            onPressed: () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Confirm Deletion'),
+                  content: const Text('Are you sure you want to delete ALL reservations? This action cannot be undone.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      child: const Text('Delete'),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirmed == true) {
+                try {
+                  final batch = FirebaseFirestore.instance.batch();
+                  final reservationsSnapshot = await FirebaseFirestore.instance.collection('reservations').get();
+
+                  for (final doc in reservationsSnapshot.docs) {
+                    batch.delete(doc.reference);
+                  }
+
+                  await batch.commit();
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('All reservations deleted successfully.')),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to delete reservations: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Delete All Reservations'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFFD50000),
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 50),
+            ),
+          ),
+          const SizedBox(height: 120),
+        ],
+
         ElevatedButton.icon(
           onPressed: () {
             Navigator.pushReplacement(
@@ -363,4 +526,9 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
     );
   }
+
+  String _formatDate(DateTime date) {
+    return '${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
+  }
+
 }

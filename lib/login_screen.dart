@@ -23,10 +23,17 @@ class _LoginScreenState extends State<LoginScreen> {
         password: passwordController.text,
       );
 
-      String userId = userCredential.user!.uid;
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+      String authUid = userCredential.user!.uid;
 
-      if (userDoc.exists) {
+      // Query users collection where authUid == authUid
+      QuerySnapshot userQuery = await FirebaseFirestore.instance
+          .collection('users')
+          .where('authUid', isEqualTo: authUid)
+          .limit(1)
+          .get();
+
+      if (userQuery.docs.isNotEmpty) {
+        var userDoc = userQuery.docs.first;
         String role = userDoc['role'];
 
         Navigator.pushReplacement(
