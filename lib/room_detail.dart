@@ -274,14 +274,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Room ${widget.roomId} - Available Slots',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),),
-        backgroundColor: const Color(0xFF8D0035),
-      ),
+      appBar: CustomAppBar(title: "Room ${widget.roomId}"),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -441,4 +434,36 @@ class ReservationStatus {
       hasPendingRequest: hasPendingRequest ?? this.hasPendingRequest,
     );
   }
+}
+
+class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
+  final String title;
+
+  const CustomAppBar({super.key, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppBar(
+      iconTheme: const IconThemeData(color: Colors.white),
+      title: Text(
+        title,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 20,
+        ),
+      ),
+      backgroundColor: const Color(0xFF8D0035),
+      elevation: 0,
+      centerTitle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          bottom: Radius.circular(20),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 }

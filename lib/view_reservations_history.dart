@@ -114,14 +114,7 @@ class _ViewRequestsHistoryScreenState extends State<ViewRequestsHistoryScreen> {
     requestsQuery = requestsQuery.orderBy('updatedAt', descending: true);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Reservation Request History',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        iconTheme: const IconThemeData(color: Colors.white),
-        backgroundColor: const Color(0xFF8D0035),
-      ),
+      appBar: CustomAppBar(title: "Request History"),
       body: Column(
         children: [
           Padding(
@@ -257,4 +250,36 @@ class _ViewRequestsHistoryScreenState extends State<ViewRequestsHistoryScreen> {
       ),
     );
   }
+}
+
+class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
+  final String title;
+
+  const CustomAppBar({super.key, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppBar(
+      iconTheme: const IconThemeData(color: Colors.white),
+      title: Text(
+        title,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 20,
+        ),
+      ),
+      backgroundColor: const Color(0xFF8D0035),
+      elevation: 0,
+      centerTitle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          bottom: Radius.circular(20),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 }
