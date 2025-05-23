@@ -791,7 +791,11 @@ class _StudentHomeContentState extends State<StudentHomeContent> {
           SizedBox(
             height: 440,
             child: userSchedule.isEmpty
-                ? const Center(child: Text("No schedule found."))
+                ? const Center(
+                child: Text(
+                  "No classes today",
+                  style: TextStyle(color: Colors.grey),
+                ))
                 : ListView.builder(
               itemCount: userSchedule.length,
               itemBuilder: (context, index) {

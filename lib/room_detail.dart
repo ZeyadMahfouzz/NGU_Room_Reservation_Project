@@ -16,11 +16,13 @@ class RoomDetailScreen extends StatefulWidget {
   State<RoomDetailScreen> createState() => _RoomDetailScreenState();
 }
 
-class _RoomDetailScreenState extends State<RoomDetailScreen> {
+class _RoomDetailScreenState extends State<RoomDetailScreen> with TickerProviderStateMixin {
   late DateTime selectedDate;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   Map<String, dynamic>? roomData;
-  String? userRole; // <-- new field to store role
+  String? userRole;
   bool loadingUserRole = true;
 
   final Map<String, String> slotTimes = {
@@ -38,34 +40,55 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
   void initState() {
     super.initState();
     selectedDate = widget.initialDate;
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
     fetchUserRoleAndRoom();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   Future<void> fetchUserRoleAndRoom() async {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) return;
 
-    // Fetch role
-    final snapshot = await _firestore
-        .collection('users')
-        .where('authUid', isEqualTo: currentUser.uid)
-        .limit(1)
-        .get();
+    try {
+      // Fetch role
+      final snapshot = await _firestore
+          .collection('users')
+          .where('authUid', isEqualTo: currentUser.uid)
+          .limit(1)
+          .get();
 
-    if (snapshot.docs.isNotEmpty) {
-      final doc = snapshot.docs.first;
-      userRole = doc['role'];
+      if (snapshot.docs.isNotEmpty) {
+        final doc = snapshot.docs.first;
+        userRole = doc['role'];
+      }
+
+      // Fetch room data
+      final roomDoc = await _firestore.collection('rooms').doc(widget.roomId).get();
+      if (roomDoc.exists) {
+        roomData = roomDoc.data();
+      }
+
+      setState(() {
+        loadingUserRole = false;
+      });
+
+      _animationController.forward();
+    } catch (e) {
+      setState(() {
+        loadingUserRole = false;
+      });
     }
-
-    // Fetch room data
-    final roomDoc = await _firestore.collection('rooms').doc(widget.roomId).get();
-    if (roomDoc.exists) {
-      roomData = roomDoc.data();
-    }
-
-    setState(() {
-      loadingUserRole = false;
-    });
   }
 
   Future<Map<String, ReservationStatus>> fetchSlotAvailability() async {
@@ -117,7 +140,6 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
       for (final doc in requestsSnapshot.docs) {
         final slot = doc.data()['slot'] as String;
         if (slotStatuses[slot]?.isAvailable ?? true) {
-          // Only mark pending if slot is still available (not reserved)
           slotStatuses[slot] = slotStatuses[slot]!.copyWith(hasPendingRequest: true);
         }
       }
@@ -132,6 +154,19 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
       initialDate: selectedDate,
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: const Color(0xFF8D0035),
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Colors.black87,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null && picked != selectedDate) {
       setState(() {
@@ -143,9 +178,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
   void _reserveSlot(String slot) async {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You must be logged in to reserve a slot.')),
-      );
+      _showSnackBar('You must be logged in to reserve a slot.', isError: true);
       return;
     }
 
@@ -153,7 +186,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
     final userEmail = currentUser.email ?? '';
     final dateStr = "${selectedDate.year.toString().padLeft(4, '0')}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}";
 
-    // Check existing pending requests (same as before)
+    // Check existing pending requests
     final existingQuery = await _firestore
         .collection('reservationRequests')
         .where('roomId', isEqualTo: widget.roomId)
@@ -164,84 +197,14 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
         .get();
 
     if (existingQuery.docs.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You already have a pending reservation request for this slot.')),
-      );
+      _showSnackBar('You already have a pending reservation request for this slot.', isError: true);
       return;
     }
 
-    // Show form dialog
-    final purposeController = TextEditingController();
-    final notesController = TextEditingController();
-    final courseCodeController = TextEditingController();
+    // Show enhanced form dialog
+    final result = await _showReservationDialog(slot, dateStr);
 
-    final formKey = GlobalKey<FormState>();
-
-    final bool? result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Reserve ${slotTimes[slot]} on $dateStr'),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Show known info read-only
-                Text('Room: ${roomData?['id'] ?? widget.roomId}'),
-                Text('Date: $dateStr'),
-                Text('Slot: ${slotTimes[slot]}'),
-                const SizedBox(height: 12),
-                // Course Code input (required)
-                TextFormField(
-                  controller: courseCodeController,
-                  decoration: const InputDecoration(
-                    labelText: 'Course Code',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) => (value == null || value.trim().isEmpty) ? 'Please enter the course code' : null,
-                ),
-                const SizedBox(height: 12),
-                const SizedBox(height: 12),
-                // Purpose input (required)
-                TextFormField(
-                  controller: purposeController,
-                  decoration: const InputDecoration(
-                    labelText: 'Purpose',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) => (value == null || value.trim().isEmpty) ? 'Please enter a purpose' : null,
-                ),
-                const SizedBox(height: 12),
-                // Optional notes
-                TextFormField(
-                  controller: notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Additional notes (optional)',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(context, true);
-              }
-            },
-            child: const Text('Submit Request'),
-          ),
-        ],
-      ),
-    );
-
-    if (result == true) {
-      // User submitted the form
+    if (result != null) {
       try {
         await _firestore.collection('reservationRequests').add({
           'roomId': widget.roomId,
@@ -249,168 +212,611 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
           'slot': slot,
           'reservedBy': userId,
           'reservedByEmail': userEmail,
-          'courseCode': courseCodeController.text.trim(),    // add this line (get courseCode from your UI or context)
-          'purpose': purposeController.text.trim(),
-          'notes': notesController.text.trim(),
-          'status': 'pending',  // Admin will approve/reject
+          'courseCode': result['courseCode'],
+          'purpose': result['purpose'],
+          'notes': result['notes'],
+          'status': 'pending',
           'createdAt': FieldValue.serverTimestamp(),
           'isSystemReserved': false,
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Reservation request sent. Awaiting admin approval.')),
-        );
-
-        setState(() {}); // Refresh UI
+        _showSnackBar('Reservation request sent successfully! Awaiting admin approval.', isError: false);
+        setState(() {});
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send reservation request: $e')),
-        );
+        _showSnackBar('Failed to send reservation request. Please try again.', isError: true);
       }
     }
   }
 
+  Future<Map<String, String>?> _showReservationDialog(String slot, String dateStr) async {
+    final purposeController = TextEditingController();
+    final notesController = TextEditingController();
+    final courseCodeController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    return showDialog<Map<String, String>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        elevation: 16,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Colors.white, Colors.grey.shade50],
+            ),
+          ),
+          child: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF8D0035).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.meeting_room,
+                          color: Color(0xFF8D0035),
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Reserve Room ${widget.roomId}',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF8D0035),
+                              ),
+                            ),
+                            Text(
+                              '${slotTimes[slot]} • $dateStr',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  _buildFormField(
+                    controller: courseCodeController,
+                    label: 'Course Code',
+                    icon: Icons.book,
+                    validator: (value) => (value == null || value.trim().isEmpty)
+                        ? 'Please enter the course code' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildFormField(
+                    controller: purposeController,
+                    label: 'Purpose',
+                    icon: Icons.assignment,
+                    validator: (value) => (value == null || value.trim().isEmpty)
+                        ? 'Please enter a purpose' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildFormField(
+                    controller: notesController,
+                    label: 'Additional notes (optional)',
+                    icon: Icons.note,
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(color: Colors.grey.shade300),
+                            ),
+                          ),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            if (formKey.currentState!.validate()) {
+                              Navigator.pop(context, {
+                                'courseCode': courseCodeController.text.trim(),
+                                'purpose': purposeController.text.trim(),
+                                'notes': notesController.text.trim(),
+                              });
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF8D0035),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 2,
+                          ),
+                          child: const Text(
+                            'Submit Request',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFormField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    String? Function(String?)? validator,
+    int maxLines = 1,
+  }) {
+    return TextFormField(
+      controller: controller,
+      validator: validator,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: const Color(0xFF8D0035)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF8D0035), width: 2),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        filled: true,
+        fillColor: Colors.grey.shade50,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      ),
+    );
+  }
+
+  void _showSnackBar(String message, {required bool isError}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              isError ? Icons.error_outline : Icons.check_circle_outline,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: isError ? Colors.red.shade600 : Colors.green.shade600,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: CustomAppBar(title: "Room ${widget.roomId}"),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            if (roomData != null)
-              Card(
-                elevation: 3,
-                margin: const EdgeInsets.only(bottom: 16),
-                child: ListTile(
-                  title: Text(
-                    'Room ${roomData!['id'] ?? widget.roomId}',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Floor: ${roomData!['floor'] ?? 'N/A'}'),
-                      Text('Type: ${roomData!['classType'] ?? 'N/A'}'),
-                      Text('Capacity: ${roomData!['capacity'] ?? 'N/A'}'),
-                    ],
+      body: loadingUserRole
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF8D0035)))
+          : FadeTransition(
+        opacity: _fadeAnimation,
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildRoomInfoCard(),
+                const SizedBox(height: 20),
+                _buildDateSelector(),
+                const SizedBox(height: 24),
+                const Text(
+                  'Available Time Slots',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF8D0035),
                   ),
                 ),
-              )
-            else
-              const Center(child: CircularProgressIndicator()),
-            ElevatedButton.icon(
-              onPressed: _selectDate,
-              icon: const Icon(Icons.calendar_today),
-              label: Text(
-                "Date: ${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}",
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8D0035),
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 45),
-              ),
+                const SizedBox(height: 12),
+                _buildSlotsList(),
+              ],
             ),
-            const SizedBox(height: 20),
-            FutureBuilder<Map<String, ReservationStatus>>(
-              future: fetchSlotAvailability(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
+          ),
+        ),
+      ),
+    );
+  }
 
-                final slotStatuses = snapshot.data ?? {};
+  Widget _buildRoomInfoCard() {
+    if (roomData == null) {
+      return Container(
+        height: 120,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Colors.grey.shade200, Colors.grey.shade100],
+          ),
+        ),
+        child: const Center(child: CircularProgressIndicator(color: Color(0xFF8D0035))),
+      );
+    }
 
-                return Expanded(
-                  child: ListView.builder(
-                    itemCount: slots.length,
-                    itemBuilder: (context, index) {
-                      final slot = slots[index];
-                      final status = slotStatuses[slot] ??
-                          ReservationStatus(isAvailable: true, reservationType: null, courseCode: null, hasPendingRequest: false);
-                      final timeRange = slotTimes[slot] ?? slot;
-
-                      return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 6),
-                        child: ListTile(
-                          title: Text(
-                            timeRange,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: status.isAvailable
-                              ? status.hasPendingRequest
-                              ? const Text(
-                            'Pending your request',
-                            style: TextStyle(color: Colors.orange),
-                          )
-                              : const Text('Available')
-                              : Text(
-                            status.reservationType == 'system'
-                                ? 'Reserved for ${status.courseCode ?? 'a course'}'
-                                : 'Reserved',
-                            style: TextStyle(
-                              color: status.reservationType == 'system'
-                                  ? Colors.blue.shade800
-                                  : Colors.orange.shade800,
-                            ),
-                          ),
-                          trailing: Builder(
-                            builder: (context) {
-                              // For students: show icon only if reserved
-                              if (userRole == 'student') {
-                                if (!status.isAvailable) {
-                                  return Icon(
-                                    status.reservationType == 'system' ? Icons.school : Icons.event_busy,
-                                    color: status.reservationType == 'system'
-                                        ? Colors.blue.shade800
-                                        : Colors.orange.shade800,
-                                  );
-                                } else {
-                                  return const SizedBox(); // Do not show button or icon if it's not reserved
-                                }
-                              }
-
-                              // For faculty/admin: show button if available
-                              if (status.isAvailable && !status.hasPendingRequest) {
-                                return ElevatedButton(
-                                  onPressed: () => _reserveSlot(slot),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF8D0035),
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  child: const Text('Reserve'),
-                                );
-                              } else {
-                                return Icon(
-                                  status.reservationType == 'system' ? Icons.school : Icons.event_busy,
-                                  color: status.reservationType == 'system'
-                                      ? Colors.blue.shade800
-                                      : Colors.orange.shade800,
-                                );
-                              }
-                            },
-                          ),
-                        ),
-                      );
-                    },
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF8D0035),
+            const Color(0xFF8D0035).withOpacity(0.8),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF8D0035).withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                );
-              },
+                  child: const Icon(
+                    Icons.meeting_room,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Room ${roomData!['id'] ?? widget.roomId}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                _buildInfoChip(Icons.layers, 'Floor ${roomData!['floor'] ?? 'N/A'}'),
+                const SizedBox(width: 12),
+                _buildInfoChip(Icons.category, roomData!['classType'] ?? 'N/A'),
+                const SizedBox(width: 12),
+                _buildInfoChip(Icons.people, '${roomData!['capacity'] ?? 'N/A'} seats'),
+              ],
             ),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildInfoChip(IconData icon, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 16),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateSelector() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _selectDate,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF8D0035).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.calendar_today,
+                    color: Color(0xFF8D0035),
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Selected Date',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "${selectedDate.day} ${_getMonthName(selectedDate.month)} ${selectedDate.year}",
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF8D0035),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_forward_ios,
+                  color: Color(0xFF8D0035),
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getMonthName(int month) {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months[month - 1];
+  }
+
+  Widget _buildSlotsList() {
+    return FutureBuilder<Map<String, ReservationStatus>>(
+      future: fetchSlotAvailability(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: CircularProgressIndicator(color: Color(0xFF8D0035)),
+            ),
+          );
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              children: [
+                Icon(Icons.error_outline, size: 48, color: Colors.red.shade400),
+                const SizedBox(height: 16),
+                Text('Error loading slots: ${snapshot.error}'),
+              ],
+            ),
+          );
+        }
+
+        final slotStatuses = snapshot.data ?? {};
+
+        return ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: slots.length,
+          separatorBuilder: (context, index) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final slot = slots[index];
+            final status = slotStatuses[slot] ??
+                ReservationStatus(
+                  isAvailable: true,
+                  reservationType: null,
+                  courseCode: null,
+                  hasPendingRequest: false,
+                );
+            return _buildSlotCard(slot, status);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildSlotCard(String slot, ReservationStatus status) {
+    final timeRange = slotTimes[slot] ?? slot;
+
+    Color cardColor = Colors.white;
+    Color borderColor = Colors.grey.shade200;
+    Color textColor = Colors.black87;
+    IconData statusIcon = Icons.schedule;
+    Color iconColor = Colors.green;
+    String statusText = 'Available';
+
+    if (!status.isAvailable) {
+      if (status.reservationType == 'system') {
+        cardColor = Colors.blue.shade50;
+        borderColor = Colors.blue.shade200;
+        iconColor = Colors.blue.shade600;
+        statusIcon = Icons.school;
+        statusText = 'Reserved for ${status.courseCode ?? 'a course'}';
+      } else {
+        cardColor = Colors.orange.shade50;
+        borderColor = Colors.orange.shade200;
+        iconColor = Colors.orange.shade600;
+        statusIcon = Icons.event_busy;
+        statusText = 'Reserved';
+      }
+    } else if (status.hasPendingRequest) {
+      cardColor = Colors.amber.shade50;
+      borderColor = Colors.amber.shade200;
+      iconColor = Colors.amber.shade600;
+      statusIcon = Icons.pending;
+      statusText = 'Pending your request';
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(statusIcon, color: iconColor, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    timeRange,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF8D0035),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    statusText,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: iconColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (_shouldShowReserveButton(status))
+              ElevatedButton(
+                onPressed: () => _reserveSlot(slot),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF8D0035),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 2,
+                ),
+                child: const Text(
+                  'Reserve',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool _shouldShowReserveButton(ReservationStatus status) {
+    // For students: never show reserve button
+    if (userRole == 'student') {
+      return false;
+    }
+
+    // For faculty/admin: show button only if available and no pending request
+    return status.isAvailable && !status.hasPendingRequest;
+  }
 }
 
 class ReservationStatus {
   final bool isAvailable;
-  final String? reservationType; // 'system' or 'manual' or null
+  final String? reservationType;
   final String? courseCode;
   final bool hasPendingRequest;
 
