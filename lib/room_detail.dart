@@ -562,7 +562,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> with TickerProvider
             text,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 12,
+              fontSize: 10,
               fontWeight: FontWeight.w500,
             ),
           ),

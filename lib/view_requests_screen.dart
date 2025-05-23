@@ -408,38 +408,6 @@ class _ViewRequestsScreenState extends State<ViewRequestsScreen> {
                                                   color: Color(0xFF8D0035),
                                                 ),
                                               ),
-                                              if (isUrgent) ...[
-                                                const SizedBox(width: 8),
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 4,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.orange,
-                                                    borderRadius: BorderRadius.circular(12),
-                                                  ),
-                                                  child: const Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      Icon(
-                                                        Icons.access_time,
-                                                        size: 12,
-                                                        color: Colors.white,
-                                                      ),
-                                                      SizedBox(width: 4),
-                                                      Text(
-                                                        'URGENT',
-                                                        style: TextStyle(
-                                                          color: Colors.white,
-                                                          fontSize: 10,
-                                                          fontWeight: FontWeight.bold,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ],
                                             ],
                                           ),
                                           const SizedBox(height: 4),
@@ -466,34 +434,71 @@ class _ViewRequestsScreenState extends State<ViewRequestsScreen> {
                                       ),
                                     ),
                                     // Pending Badge
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.orange.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: const Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.schedule,
-                                            size: 16,
-                                            color: Colors.orange,
-                                          ),
-                                          SizedBox(width: 4),
-                                          Text(
-                                            'PENDING',
-                                            style: TextStyle(
+                                    Column(
+                                      children: [
+                                        if (isUrgent) ...[
+                                          const SizedBox(height: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
                                               color: Colors.orange,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 12,
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.access_time,
+                                                  size: 12,
+                                                  color: Colors.white,
+                                                ),
+                                                SizedBox(width: 4),
+                                                Text(
+                                                  'URGENT',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ],
-                                      ),
+                                        SizedBox(height: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.orange.withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(20),
+                                          ),
+                                          child: const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.schedule,
+                                                size: 16,
+                                                color: Colors.orange,
+                                              ),
+                                              SizedBox(width: 4),
+                                              Text(
+                                                'PENDING',
+                                                style: TextStyle(
+                                                  color: Colors.orange,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
