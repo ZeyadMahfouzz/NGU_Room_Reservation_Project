@@ -496,7 +496,7 @@ class ScheduleSection extends StatelessWidget {
   }
 }
 
-// Faculty Home Content
+// Faculty Home Content - Updated with horizontal action buttons
 class FacultyHomeContent extends StatefulWidget {
   const FacultyHomeContent({super.key});
 
@@ -570,73 +570,152 @@ class _FacultyHomeContentState extends State<FacultyHomeContent> {
   Widget build(BuildContext context) {
     return loading
         ? const Center(child: CircularProgressIndicator())
-        : SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Today's Schedule",
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
+        : Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Today's Schedule",
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 400,
-            child: userSchedule.isEmpty
-                ? const Center(
-                child: Text(
-                  "No classes today",
-                  style: TextStyle(color: Colors.grey),
-                ))
-                : ListView.builder(
-              itemCount: userSchedule.length,
-              itemBuilder: (context, index) {
-                return ScheduleCard(
-                    scheduleItem: userSchedule[index]);
-              },
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 372,
+              child: userSchedule.isEmpty
+                  ? const Center(
+                  child: Text(
+                    "No classes today",
+                    style: TextStyle(color: Colors.grey),
+                  ))
+                  : ListView.builder(
+                itemCount: userSchedule.length,
+                itemBuilder: (context, index) {
+                  return ScheduleCard(
+                      scheduleItem: userSchedule[index]);
+                },
+              ),
             ),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            "Actions",
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
+            const SizedBox(height: 5),
+            const Text(
+              "Actions",
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
             ),
-          ),
-          const SizedBox(height: 15),
-          UniversalActionCard(
-            icon: Icons.meeting_room_rounded,
-            title: "View Rooms",
-            subtitle: "Check room availability",
-            color: const Color(0xFF8D0035),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const ViewRoomsScreen()),
-              );
-            },
-          ),
-          UniversalActionCard(
-            icon: Icons.history_rounded,
-            title: "View History",
-            subtitle: "Check past reservations",
-            color: Colors.blue,
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const ViewRequestsHistoryScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: 40),
-        ],
+            const SizedBox(height: 6),
+            // Horizontal Action Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: HorizontalActionCard(
+                    icon: Icons.meeting_room_rounded,
+                    title: "View Rooms",
+                    subtitle: "Check room availability",
+                    color: const Color(0xFF8D0035),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const ViewRoomsScreen()),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: HorizontalActionCard(
+                    icon: Icons.history_rounded,
+                    title: "View History",
+                    subtitle: "Check past reservations",
+                    color: Colors.blue,
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const ViewRequestsHistoryScreen()),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+
+          ],
+        );
+  }
+}
+
+// Horizontal Action Card Component for Faculty
+class HorizontalActionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onPressed;
+
+  const HorizontalActionCard({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 28),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -775,51 +854,48 @@ class _StudentHomeContentState extends State<StudentHomeContent> {
   Widget build(BuildContext context) {
     return loading
         ? const Center(child: CircularProgressIndicator())
-        : SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Today's Schedule",
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
+        : Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Today's Schedule",
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 440,
-            child: userSchedule.isEmpty
-                ? const Center(
-                child: Text(
-                  "No classes today",
-                  style: TextStyle(color: Colors.grey),
-                ))
-                : ListView.builder(
-              itemCount: userSchedule.length,
-              itemBuilder: (context, index) {
-                return ScheduleCard(scheduleItem: userSchedule[index]);
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 455,
+              child: userSchedule.isEmpty
+                  ? const Center(
+                  child: Text(
+                    "No classes today",
+                    style: TextStyle(color: Colors.grey),
+                  ))
+                  : ListView.builder(
+                itemCount: userSchedule.length,
+                itemBuilder: (context, index) {
+                  return ScheduleCard(scheduleItem: userSchedule[index]);
+                },
+              ),
+            ),
+
+            UniversalActionCard(
+              icon: Icons.meeting_room_rounded,
+              title: "View Rooms",
+              subtitle: "Check room availability",
+              color: const Color(0xFF8D0035),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ViewRoomsScreen()),
+                );
               },
             ),
-          ),
-          const SizedBox(height: 15),
-          UniversalActionCard(
-            icon: Icons.meeting_room_rounded,
-            title: "View Rooms",
-            subtitle: "Check room availability",
-            color: const Color(0xFF8D0035),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ViewRoomsScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: 15),
-        ],
-      ),
-    );
+          ],
+        );
   }
 }
 

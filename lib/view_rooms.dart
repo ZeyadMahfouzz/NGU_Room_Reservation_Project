@@ -140,7 +140,6 @@ class _ViewRoomsScreenState extends State<ViewRoomsScreen> with TickerProviderSt
     }
 
     if (selectedFloor != null && selectedFloor!.isNotEmpty) {
-      // Convert to int if possible for proper comparison
       final floorValue = int.tryParse(selectedFloor!) ?? selectedFloor!;
       query = query.where('floor', isEqualTo: floorValue);
     }
@@ -185,6 +184,8 @@ class _ViewRoomsScreenState extends State<ViewRoomsScreen> with TickerProviderSt
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
+      // Add resizeToAvoidBottomInset to handle keyboard
+      resizeToAvoidBottomInset: true,
       appBar: CustomAppBar(title: "Room Explorer"),
       body: isLoading
           ? const Center(
@@ -196,7 +197,7 @@ class _ViewRoomsScreenState extends State<ViewRoomsScreen> with TickerProviderSt
         opacity: _fadeAnimation,
         child: Column(
           children: [
-            // Collapsible Filter Section
+            // Collapsible Filter Section - Wrap in SingleChildScrollView when expanded
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -330,130 +331,135 @@ class _ViewRoomsScreenState extends State<ViewRoomsScreen> with TickerProviderSt
                     ),
                   ),
 
-                  // Expandable Filter Content
+                  // Expandable Filter Content - Make it scrollable when keyboard appears
                   SizeTransition(
                     sizeFactor: _filterSlideAnimation,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                      child: Column(
-                        children: [
-                          // Date Filter
-                          Container(
-                            width: double.infinity,
-                            margin: const EdgeInsets.only(bottom: 16),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF8D0035), Color(0xFFB91C4D)],
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF8D0035).withOpacity(0.3),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 4),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.height * 0.4, // Limit height
+                      ),
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                        child: Column(
+                          children: [
+                            // Date Filter
+                            Container(
+                              width: double.infinity,
+                              margin: const EdgeInsets.only(bottom: 16),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF8D0035), Color(0xFFB91C4D)],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
                                 ),
-                              ],
-                            ),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                onTap: _selectDate,
                                 borderRadius: BorderRadius.circular(12),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.calendar_today_rounded,
-                                        color: Colors.white,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          const Text(
-                                            'Selected Date',
-                                            style: TextStyle(
-                                              color: Colors.white70,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                          Text(
-                                            "${selectedDate.day.toString().padLeft(2, '0')}/${selectedDate.month.toString().padLeft(2, '0')}/${selectedDate.year}",
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const Spacer(),
-                                      const Icon(
-                                        Icons.edit_calendar,
-                                        color: Colors.white70,
-                                        size: 18,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-
-                          // Dropdown Filters
-                          Column(
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildEnhancedDropdown(
-                                      value: selectedBuilding,
-                                      hint: 'Buildings',
-                                      icon: Icons.apartment,
-                                      items: buildingOptions,
-                                      onChanged: (val) {
-                                        setState(() {
-                                          selectedBuilding = val == '' ? null : val;
-                                        });
-                                      },
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _buildEnhancedDropdown(
-                                      value: selectedClassType,
-                                      hint: 'Class Types',
-                                      icon: Icons.school,
-                                      items: classTypeOptions,
-                                      onChanged: (val) {
-                                        setState(() {
-                                          selectedClassType = val == '' ? null : val;
-                                        });
-                                      },
-                                    ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF8D0035).withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 12),
-                              _buildEnhancedDropdown(
-                                value: selectedFloor,
-                                hint: 'All Floors',
-                                icon: Icons.layers,
-                                items: floorOptions,
-                                onChanged: (val) {
-                                  setState(() {
-                                    selectedFloor = val == '' ? null : val;
-                                  });
-                                },
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: _selectDate,
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.calendar_today_rounded,
+                                          color: Colors.white,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            const Text(
+                                              'Selected Date',
+                                              style: TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                            Text(
+                                              "${selectedDate.day.toString().padLeft(2, '0')}/${selectedDate.month.toString().padLeft(2, '0')}/${selectedDate.year}",
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const Spacer(),
+                                        const Icon(
+                                          Icons.edit_calendar,
+                                          color: Colors.white70,
+                                          size: 18,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ],
-                          ),
-                        ],
+                            ),
+
+                            // Dropdown Filters
+                            Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _buildEnhancedDropdown(
+                                        value: selectedBuilding,
+                                        hint: 'Buildings',
+                                        icon: Icons.apartment,
+                                        items: buildingOptions,
+                                        onChanged: (val) {
+                                          setState(() {
+                                            selectedBuilding = val == '' ? null : val;
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: _buildEnhancedDropdown(
+                                        value: selectedClassType,
+                                        hint: 'Class Types',
+                                        icon: Icons.school,
+                                        items: classTypeOptions,
+                                        onChanged: (val) {
+                                          setState(() {
+                                            selectedClassType = val == '' ? null : val;
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                _buildEnhancedDropdown(
+                                  value: selectedFloor,
+                                  hint: 'All Floors',
+                                  icon: Icons.layers,
+                                  items: floorOptions,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      selectedFloor = val == '' ? null : val;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -461,8 +467,8 @@ class _ViewRoomsScreenState extends State<ViewRoomsScreen> with TickerProviderSt
               ),
             ),
 
-            // Enhanced Rooms List
-            Expanded(
+            // Enhanced Rooms List - Flexible to take remaining space
+            Flexible(
               child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: _roomsStream(),
                 builder: (context, snapshot) {
@@ -510,49 +516,51 @@ class _ViewRoomsScreenState extends State<ViewRoomsScreen> with TickerProviderSt
 
                   if (filteredRooms.isEmpty) {
                     return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            searchQuery.isNotEmpty ? Icons.search_off : Icons.filter_list_off,
-                            size: 64,
-                            color: Colors.grey[400],
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            searchQuery.isNotEmpty ? 'No rooms match your search' : 'No rooms found',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w600,
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              searchQuery.isNotEmpty ? Icons.search_off : Icons.filter_list_off,
+                              size: 64,
+                              color: Colors.grey[400],
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            searchQuery.isNotEmpty
-                                ? 'Try a different search term or adjust filters'
-                                : 'Try adjusting your filters',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[500],
-                            ),
-                          ),
-                          if (_activeFiltersCount > 0) ...[
                             const SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              onPressed: _clearFilters,
-                              icon: const Icon(Icons.clear_all, size: 18),
-                              label: const Text('Clear All Filters'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF8D0035),
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
+                            Text(
+                              searchQuery.isNotEmpty ? 'No rooms match your search' : 'No rooms found',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
+                            const SizedBox(height: 8),
+                            Text(
+                              searchQuery.isNotEmpty
+                                  ? 'Try a different search term or adjust filters'
+                                  : 'Try adjusting your filters',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                            if (_activeFiltersCount > 0) ...[
+                              const SizedBox(height: 16),
+                              ElevatedButton.icon(
+                                onPressed: _clearFilters,
+                                icon: const Icon(Icons.clear_all, size: 18),
+                                label: const Text('Clear All Filters'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF8D0035),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     );
                   }

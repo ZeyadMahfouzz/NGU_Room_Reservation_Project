@@ -534,9 +534,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> with TickerProvider
             Row(
               children: [
                 _buildInfoChip(Icons.layers, 'Floor ${roomData!['floor'] ?? 'N/A'}'),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 _buildInfoChip(Icons.category, roomData!['classType'] ?? 'N/A'),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 _buildInfoChip(Icons.people, '${roomData!['capacity'] ?? 'N/A'} seats'),
               ],
             ),
